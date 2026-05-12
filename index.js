@@ -14,7 +14,7 @@ const client = new Client({
 });
 
 // ✅ Replace these two IDs
-const APPLICATION_ID = "1503715390323294340"; // Your Application ID
+const APPLICATION_ID = "1503726778571816980"; // Your Application ID
 const GUILD_ID = "1184927046103736350"; // Your Server ID
 
 // ✅ Slash Command
