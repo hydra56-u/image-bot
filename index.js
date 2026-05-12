@@ -1,11 +1,23 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, SlashCommandBuilder, Routes } = require('discord.js');
+
+const { 
+    Client, 
+    GatewayIntentBits, 
+    SlashCommandBuilder, 
+    Routes 
+} = require('discord.js');
+
 const { REST } = require('@discordjs/rest');
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
+// ✅ Replace these two IDs
+const APPLICATION_ID = "1503715390323294340"; // Your Application ID
+const GUILD_ID = "1184927046103736350"; // Your Server ID
+
+// ✅ Slash Command
 const commands = [
     new SlashCommandBuilder()
         .setName('image')
@@ -19,11 +31,20 @@ const commands = [
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
+// ✅ Register Guild Commands (Instant)
 (async () => {
-    await rest.put(
-        Routes.applicationCommands("1503715390323294340"), // Replace this
-        { body: commands }
-    );
+    try {
+        console.log("🔄 Registering slash commands...");
+
+        await rest.put(
+            Routes.applicationGuildCommands(APPLICATION_ID, GUILD_ID),
+            { body: commands }
+        );
+
+        console.log("✅ Slash commands registered instantly!");
+    } catch (error) {
+        console.error(error);
+    }
 })();
 
 client.once('ready', () => {
