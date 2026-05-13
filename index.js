@@ -1,10 +1,10 @@
 require('dotenv').config();
 
-const { 
-    Client, 
-    GatewayIntentBits, 
-    SlashCommandBuilder, 
-    Routes 
+const {
+    Client,
+    GatewayIntentBits,
+    SlashCommandBuilder,
+    Routes
 } = require('discord.js');
 
 const { REST } = require('@discordjs/rest');
@@ -13,11 +13,9 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
-// ✅ Replace these two IDs
-const APPLICATION_ID = "1503726778571816980"; // Your Application ID
-const GUILD_ID = "1184927046103736350"; // Your Server ID
+const APPLICATION_ID = "1503726778571816980";
+const GUILD_ID = "1184927046103736350";
 
-// ✅ Slash Command
 const commands = [
     new SlashCommandBuilder()
         .setName('image')
@@ -27,23 +25,21 @@ const commands = [
                 .setDescription('Describe your image')
                 .setRequired(true)
         )
-].map(command => command.toJSON());
+].map(cmd => cmd.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
-// ✅ Register Guild Commands (Instant)
+// ✅ Register Commands
 (async () => {
     try {
         console.log("🔄 Registering slash commands...");
-
         await rest.put(
             Routes.applicationGuildCommands(APPLICATION_ID, GUILD_ID),
             { body: commands }
         );
-
-        console.log("✅ Slash commands registered instantly!");
+        console.log("✅ Slash commands registered!");
     } catch (error) {
-        console.error(error);
+        console.error("Command register error:", error);
     }
 })();
 
@@ -55,16 +51,32 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === 'image') {
-        const prompt = interaction.options.getString('prompt');
+        try {
+            await interaction.deferReply(); // ✅ Prevent timeout
 
-        await interaction.deferReply();
+            const prompt = interaction.options.getString('prompt');
 
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024`;
+            if (!prompt) {
+                return await interaction.editReply("❌ Please provide a prompt.");
+            }
 
-        await interaction.editReply({
-            content: `🎨 Image for: **${prompt}**`,
-            files: [imageUrl]
-        });
+            const imageUrl =
+                `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024`;
+
+            await interaction.editReply({
+                content: `🎨 Image for: **${prompt}**`,
+                files: [imageUrl]
+            });
+
+        } catch (error) {
+            console.error("Image command error:", error);
+
+            if (interaction.deferred) {
+                await interaction.editReply("❌ Failed to generate image. Try again.");
+            } else {
+                await interaction.reply("❌ Something went wrong.");
+            }
+        }
     }
 });
 
