@@ -5,11 +5,7 @@ const {
     GatewayIntentBits,
     SlashCommandBuilder,
     Routes,
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    StringSelectMenuBuilder
+    EmbedBuilder
 } = require('discord.js');
 
 const { REST } = require('@discordjs/rest');
@@ -21,28 +17,14 @@ const client = new Client({
 const APPLICATION_ID = "1503726778571816980";
 const GUILD_ID = "1184927046103736350";
 
-function randomColor() {
-    return Math.floor(Math.random() * 16777215);
-}
-
-// ✅ Slash Command
 const commands = [
     new SlashCommandBuilder()
         .setName('image')
-        .setDescription('Generate advanced AI images')
+        .setDescription('Generate SDXL realistic image')
         .addStringOption(option =>
             option.setName('prompt')
                 .setDescription('Describe your image')
                 .setRequired(true)
-        )
-        .addStringOption(option =>
-            option.setName('quality')
-                .setDescription('Image quality')
-                .setRequired(false)
-                .addChoices(
-                    { name: 'Normal (1024px)', value: '1024' },
-                    { name: 'HD (2048px)', value: '2048' }
-                )
         )
 ].map(cmd => cmd.toJSON());
 
@@ -53,7 +35,6 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
         Routes.applicationGuildCommands(APPLICATION_ID, GUILD_ID),
         { body: commands }
     );
-    console.log("✅ Slash commands registered!");
 })();
 
 client.once('ready', () => {
@@ -62,121 +43,47 @@ client.once('ready', () => {
 
 client.on('interactionCreate', async interaction => {
 
-    // ✅ Slash Command
-    if (interaction.isChatInputCommand()) {
+    if (!interaction.isChatInputCommand()) return;
 
-        if (interaction.commandName === 'image') {
+    if (interaction.commandName === 'image') {
 
-            await interaction.deferReply();
+        await interaction.deferReply();
 
-            const prompt = interaction.options.getString('prompt');
-            const quality = interaction.options.getString('quality') || "1024";
+        const prompt = interaction.options.getString('prompt');
 
-            const styledPrompt = prompt;
+        try {
+            const response = await fetch(
+                "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${process.env.HF_TOKEN}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        inputs: prompt
+                    })
+                }
+            );
 
-            const embeds = [];
+            const buffer = await response.arrayBuffer();
+            const image = Buffer.from(buffer);
 
-            for (let i = 0; i < 4; i++) {
-                const imageUrl =
-                    `https://image.pollinations.ai/prompt/${encodeURIComponent(styledPrompt)}?width=${quality}&height=${quality}&seed=${Math.floor(Math.random()*100000)}`;
-
-                const embed = new EmbedBuilder()
-                    .setColor(randomColor())
-                    .setTitle(`🎨 AI Image ${i + 1}`)
-                    .setDescription(`✨ **Prompt:** ${prompt}`)
-                    .setImage(imageUrl)
-                    .setFooter({ text: "Free AI Image Bot 🚀" })
-                    .setTimestamp();
-
-                embeds.push(embed);
-            }
-
-            const regenerateButton = new ButtonBuilder()
-                .setCustomId(`regen_${prompt}_${quality}`)
-                .setLabel("🔄 Regenerate")
-                .setStyle(ButtonStyle.Primary);
-
-            const styleMenu = new StringSelectMenuBuilder()
-                .setCustomId(`style_${prompt}_${quality}`)
-                .setPlaceholder("🎭 Choose Style")
-                .addOptions([
-                    { label: "Anime", value: "anime" },
-                    { label: "Realistic", value: "realistic" },
-                    { label: "Fantasy", value: "fantasy" }
-                ]);
-
-            const row1 = new ActionRowBuilder().addComponents(regenerateButton);
-            const row2 = new ActionRowBuilder().addComponents(styleMenu);
+            const embed = new EmbedBuilder()
+                .setColor(Math.floor(Math.random() * 16777215))
+                .setTitle("🎨 SDXL Image")
+                .setDescription(`✨ **Prompt:** ${prompt}`)
+                .setImage("attachment://image.png")
+                .setTimestamp();
 
             await interaction.editReply({
-                embeds: embeds,
-                components: [row1, row2]
+                embeds: [embed],
+                files: [{ attachment: image, name: "image.png" }]
             });
-        }
-    }
 
-    // ✅ Regenerate Button
-    if (interaction.isButton()) {
-
-        if (interaction.customId.startsWith("regen_")) {
-
-            await interaction.deferUpdate();
-
-            const parts = interaction.customId.split("_");
-            const prompt = parts[1];
-            const quality = parts[2];
-
-            const embeds = [];
-
-            for (let i = 0; i < 4; i++) {
-                const imageUrl =
-                    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${quality}&height=${quality}&seed=${Math.floor(Math.random()*100000)}`;
-
-                const embed = new EmbedBuilder()
-                    .setColor(randomColor())
-                    .setTitle(`🎨 AI Image ${i + 1}`)
-                    .setDescription(`✨ **Prompt:** ${prompt}`)
-                    .setImage(imageUrl)
-                    .setTimestamp();
-
-                embeds.push(embed);
-            }
-
-            await interaction.editReply({ embeds: embeds });
-        }
-    }
-
-    // ✅ Style Selector
-    if (interaction.isStringSelectMenu()) {
-
-        if (interaction.customId.startsWith("style_")) {
-
-            await interaction.deferUpdate();
-
-            const selectedStyle = interaction.values[0];
-            const parts = interaction.customId.split("_");
-            const prompt = parts[1];
-            const quality = parts[2];
-
-            const styledPrompt = `${selectedStyle} style ${prompt}`;
-
-            const embeds = [];
-
-            for (let i = 0; i < 4; i++) {
-                const imageUrl =
-                    `https://image.pollinations.ai/prompt/${encodeURIComponent(styledPrompt)}?width=${quality}&height=${quality}&seed=${Math.floor(Math.random()*100000)}`;
-
-                const embed = new EmbedBuilder()
-                    .setColor(randomColor())
-                    .setTitle(`🎨 ${selectedStyle.toUpperCase()} Image ${i + 1}`)
-                    .setDescription(`✨ **Prompt:** ${styledPrompt}`)
-                    .setImage(imageUrl)
-                    .setTimestamp();
-
-                embeds.push(embed);
-            }
-
-            await interaction.editReply({ embeds: embeds });
+        } catch (error) {
+            console.error(error);
+            await interaction.editReply("❌ SDXL generation failed.");
         }
     }
 
