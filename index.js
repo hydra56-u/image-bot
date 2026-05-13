@@ -1,46 +1,3 @@
-require('dotenv').config();
-
-const {
-    Client,
-    GatewayIntentBits,
-    SlashCommandBuilder,
-    Routes,
-    EmbedBuilder
-} = require('discord.js');
-
-const { REST } = require('@discordjs/rest');
-
-const client = new Client({
-    intents: [GatewayIntentBits.Guilds]
-});
-
-const APPLICATION_ID = "1503726778571816980";
-const GUILD_ID = "1184927046103736350";
-
-const commands = [
-    new SlashCommandBuilder()
-        .setName('image')
-        .setDescription('Generate SDXL realistic image')
-        .addStringOption(option =>
-            option.setName('prompt')
-                .setDescription('Describe your image')
-                .setRequired(true)
-        )
-].map(cmd => cmd.toJSON());
-
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-
-(async () => {
-    await rest.put(
-        Routes.applicationGuildCommands(APPLICATION_ID, GUILD_ID),
-        { body: commands }
-    );
-})();
-
-client.once('ready', () => {
-    console.log(`✅ ${client.user.tag} is online!`);
-});
-
 client.on('interactionCreate', async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
@@ -52,6 +9,7 @@ client.on('interactionCreate', async interaction => {
         const prompt = interaction.options.getString('prompt');
 
         try {
+
             const response = await fetch(
                 "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
                 {
@@ -61,10 +19,17 @@ client.on('interactionCreate', async interaction => {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        inputs: prompt
+                        inputs: prompt,
+                        options: { wait_for_model: true }
                     })
                 }
             );
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("HF Error:", errorText);
+                return await interaction.editReply("❌ Model loading or API error. Try again in 30 seconds.");
+            }
 
             const buffer = await response.arrayBuffer();
             const image = Buffer.from(buffer);
@@ -82,11 +47,8 @@ client.on('interactionCreate', async interaction => {
             });
 
         } catch (error) {
-            console.error(error);
-            await interaction.editReply("❌ SDXL generation failed.");
+            console.error("Generation Error:", error);
+            await interaction.editReply("❌ SDXL generation failed. Server busy.");
         }
     }
-
 });
-
-client.login(process.env.TOKEN);
